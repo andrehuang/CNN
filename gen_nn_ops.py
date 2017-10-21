@@ -282,7 +282,6 @@ def _bias_add(value, bias, data_format=None, name=None):
   return result
 
 
-
 def bias_add_grad(out_backprop, data_format=None, name=None):
   r"""The backward operation for "BiasAdd" on the "bias" tensor.
 
