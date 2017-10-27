@@ -73,6 +73,16 @@ with tf.device(device_type): # <= This is optional
     _pred = conv_simple(x, weights, biases)['out']
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(_pred, y))
     optm = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(cost)
+
+#####################################################################################
+# TODO get gradient From the backpropagation and update backward using our own backward function
+#   gOptimizer = tf.train.GradientDescentOptimizer(learning_date=learning_date)
+#   dzdx = gOptimizer.compute_gradients(cost, var_list = _input)
+#   dwdx = gOptimizer.compute_gradients(cost, var_list = _W)
+#   dzdx_new = getMaskonGradients(dzdx,dwdx, [other necessary arguments]) #Steps for our own gradient in a seperate function
+#   newGOptimizer = gOptimizer.apply_gradients([dzdx_new, _input])
+#   optm = newGOptimizer.minimize(cost)
+###################################################################################3
     _corr = tf.equal(tf.argmax(_pred,1), tf.argmax(y,1)) # Count corrects
     accr = tf.reduce_mean(tf.cast(_corr, tf.float32))
     init = tf.initialize_all_variables()
