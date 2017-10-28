@@ -1,5 +1,9 @@
 # CNN
 
-## gen_nn_ops is for forward and backprop operation
+## Haiwen's approach
 
-## the experiment is conducted with Mnist data, (in the file: cnn mnist).
+My approach is to create a new op with its bprop method and put it into the tensorflow, which will enable auto-training and gradient-computing.
+
+I've already succeeded in creating an relu op with its bprop method. In the ***our_cnn_mnist.py***, I changed the activation function of conv1 to our customized tf_relu, and now it can run and get gradients successfully.
+
+Under this approach, our next step is to modify the ***our_py_func.py***, change the demo function into our customized mask and its bprop method. Hopefully we could get it done soon!
