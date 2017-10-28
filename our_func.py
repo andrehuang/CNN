@@ -12,47 +12,70 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import ops
 
+
+# our hack
+def py_func(func, inp, tout, stateful=True, name=None, grad=None):
+    """
+    I omitted the introduction to parameters that are not of interest
+    :param func: a numpy function
+    :param inp: input tensors
+    :param grad: a tensorflow function to get the gradients (used in bprop, should be able to receive previous 
+                gradients and send gradients down.)
+    
+    :return: a tensorflow op with a registered bprop method —— This is what we WANT!
+    """
+    # Need to generate a unique name to avoid duplicates:
+    rnd_name = 'PyFuncGrad' + str(np.random.randint(0, 1000000))
+    tf.RegisterGradient(rnd_name)(grad)
+    g = tf.get_default_graph()
+    with g.gradient_override_map({"PyFunc": rnd_name}):
+        return tf.py_func(func, inp, tout, stateful=stateful, name=name)
+
 def np_relu(x):
     """
-    :param x: a Tensor object
-    :return: 
+    :param x: an array
+    :return: an array
     """
-    y = np.maximum(x, 0)
-    return y
-
-# np_relu = np.vectorize(our_relu)
+    return np.maximum(x, 0)
+# make the date type compatible with tensorflow
 np_relu_32 = lambda x: np_relu(x).astype(np.float32)
 
-# Next,
-# define the gradient function of our operation for each input
+
+# The next three functions help us get a tf function to get gradients in bprop
+# corresponding to our customized op
+
 def d_relu(x):
+    """
+    CURRENTLY,
+    :param x: a number
+    :return:  a number
+    BUT as long as we can define this function with array input and array output, i.e. a numpy function,
+    We don't need to vectorize it later.
+    """
     if x > 0:
         return 1
     else:
         return 0
-np_d_relu = np.vectorize(d_relu)
-# vectorizing: making it into a numpy function
-
-np_d_relu_32 = lambda x: np_d_relu(x).astype(np.float32)
-# One thing to be careful of at this point is that numpy used float64
-# but tensorflow uses float32 so you need to convert your function
-# to use float32 before you can convert it to a tensorflow function
-# otherwise tensorflow will complain.
+d_relu = np.vectorize(d_relu) # vectorizing: making it into a numpy function
+d_relu_32 = lambda x: d_relu(x).astype(np.float32)  # make data type compatible
 
 
-# Notice that we need to return tensorflow functions of the input
 # transform the numpy function into a Tensorflow function
 def tf_d_relu(x, name=None):
+    """
+    :param x: a list of tensors (but we can just see it as a tensor)
+    :param name: 
+    :return: a tensor
+    """
     with ops.name_scope(name, "d_relu", [x]) as name:   # where bug is
-        z = tf.py_func(np_d_relu_32,
+        z = tf.py_func(d_relu_32,
                     [x],
                     tf.float32,
                     name=name,
                     stateful=False)
         return z[0]
 # tf.py_func acts on lists of tensors (and returns a list of tensors),
-# that is why we have [x] (and return y[0]).
-
+# that is why we have [x] (and return z[0]).
 
 def our_grad(cus_op, grad):
     """Compute gradients of our custom operation.
@@ -66,31 +89,9 @@ def our_grad(cus_op, grad):
     x = cus_op.inputs[0]
     n_gr = tf_d_relu(x)
     return tf.multiply(grad, n_gr)
-# NEEDS POLISHED! ESPECIALLY THE SHAPE NEEDS TO MATCH!
-
-# our hack
-def py_func(func, inp, tout, stateful=True, name=None, grad=None):
-    """
-    :param func: 
-    :param inp: 
-    :param tout: 
-    :param stateful: tells the tensorflow whether the function always 
-        gives the same output for the same input, 
-        in which case tensorflow can simplify the tensorflow graph.
-        
-        BUT We don't really care about this detail right now!
-    :param name: 
-    :param grad: 
-    :return: 
-    """
-    # Need to generate a unique name to avoid duplicates:
-    rnd_name = 'PyFuncGrad' + str(np.random.randint(0, 100000))
-    tf.RegisterGradient(rnd_name)(grad)
-    g = tf.get_default_graph()
-    with g.gradient_override_map({"PyFunc": rnd_name}):
-        return tf.py_func(func, inp, tout, stateful=stateful, name=name)
 
 
+# our final op
 def tf_relu(x, name=None):
     with ops.name_scope(name, "OurRelu", [x]) as name:   # where bug is
         z = py_func(np_relu_32,
@@ -102,9 +103,6 @@ def tf_relu(x, name=None):
         z = z[0]      # z is a tensor now
         z.set_shape(x.get_shape())    # We need to give z a shape
         return z  # Tensor("OurRelu:0", dtype=float32)
-# DON'T UNDERSTAND:
-# tf.py_func acts on lists of tensors (and returns a list of tensors),
-# that is why we have [x,y] (and return z[0])
 
 # Test:
 # with tf.Session() as sess:
@@ -115,6 +113,3 @@ def tf_relu(x, name=None):
 #     gr = tf.gradients(z, [x])[0]
 #     tf.global_variables_initializer().run()
 #     print(x.eval(), z.eval(), gr.eval())
-    #print(x.eval(), z.eval())
-# After debugging the line100, we can try substitute the relu function in cnn_mnist with this customized tf_relu
-# to see whether this method works or not.
