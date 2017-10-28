@@ -43,20 +43,6 @@ def cnn_model_fn(features, labels, mode):
       kernel_size=[5, 5],
       padding="same",
       activation=tf_relu)
-  # the output's shape is unknown
-  # if x.get_shape().ndims is None:
-  #     raise ValueError('Input ' + str(input_index) + ' of layer ' +
-  #                      self.name + ' is incompatible with the layer: '
-  #                                  'its rank is undefined, by the layer requires a '
-  #                                  'defined rank.')
-
-
-
-  # 不知道有没有可能找到原来的tf.nn.relu的具体实现代码比较一下
-  # 我觉得可能是Tensor这个object比较傲娇。。在convolutional.py里面，是写了怎么把relu加到outputs上的
-  # 但是outputs是什么呢？
-
-# why the output is 0?
 
 
   # Pooling Layer #1
