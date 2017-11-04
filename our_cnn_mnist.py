@@ -16,6 +16,8 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from our_func import tf_relu
+
 
 import numpy as np
 import tensorflow as tf
@@ -40,7 +42,8 @@ def cnn_model_fn(features, labels, mode):
       filters=32,
       kernel_size=[5, 5],
       padding="same",
-      activation=tf.nn.relu)
+      activation=tf_relu)
+
 
   # Pooling Layer #1
   # First max pooling layer with a 2x2 filter and stride of 2
@@ -53,6 +56,13 @@ def cnn_model_fn(features, labels, mode):
   # Padding is added to preserve width and height.
   # Input Tensor Shape: [batch_size, 14, 14, 32]
   # Output Tensor Shape: [batch_size, 14, 14, 64]
+  # conv2 = tf.layers.conv2d(
+  #     inputs=pool1,
+  #     filters=64,
+  #     kernel_size=[5, 5],
+  #     padding="same",
+  #     activation=tf.nn.relu)
+
   conv2 = tf.layers.conv2d(
       inputs=pool1,
       filters=64,
@@ -60,29 +70,23 @@ def cnn_model_fn(features, labels, mode):
       padding="same",
       activation=tf.nn.relu)
 
+
   # Pooling Layer #2
   # Second max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 14, 14, 64]
   # Output Tensor Shape: [batch_size, 7, 7, 64]
   pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
 
-
-# 在这里插入mask的操作，需要在tf.layers里面加一类
-#  conv_mask = tf.layers.conv_mask(inputs=pool2)
-# 需要知道pool2的输出（即layers函数类的输出），利用这个输出算出mu和mask,
-# 所以似乎不需要其他的inputs了
-
-
   # Flatten tensor into a batch of vectors
   # Input Tensor Shape: [batch_size, 7, 7, 64]
   # Output Tensor Shape: [batch_size, 7 * 7 * 64]
-#  pool2_flat = tf.reshape(conv_mask, [-1, 7 * 7 * 64])
+  pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
 
   # Dense Layer
   # Densely connected layer with 1024 neurons
-  # Input Tensor Shape: [batch_size, 7 , 7 , 64] （modified）
+  # Input Tensor Shape: [batch_size, 7 * 7 * 64]
   # Output Tensor Shape: [batch_size, 1024]
-  dense = tf.layers.dense(inputs=pool2, units=1024, activation=tf.nn.relu)
+  dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
 
   # Add dropout operation; 0.6 probability that element will be kept
   dropout = tf.layers.dropout(
@@ -103,33 +107,19 @@ def cnn_model_fn(features, labels, mode):
   if mode == tf.estimator.ModeKeys.PREDICT:
     return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
-
-# 总的Loss function，不用变
   # Calculate Loss (for both TRAIN and EVAL modes)
   onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=10)
   loss = tf.losses.softmax_cross_entropy(
       onehot_labels=onehot_labels, logits=logits)
 
-
-# Training的时候的loss计算，和gradient descent方法的实现需要改
   # Configure the Training Op (for TRAIN mode)
   if mode == tf.estimator.ModeKeys.TRAIN:
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
-    # 只是定义出了一个optimizer，具体怎么用在下面写：
-
-    # 这一步可以拆成compute和apply
     train_op = optimizer.minimize(
         loss=loss,
         global_step=tf.train.get_global_step())
-
-    # 所以train的关键是这个minimize函数
-
-
     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
-
-
-# 先不管
   # Add evaluation metrics (for EVAL mode)
   eval_metric_ops = {
       "accuracy": tf.metrics.accuracy(
@@ -145,7 +135,6 @@ def main(unused_argv):
   train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
   eval_data = mnist.test.images  # Returns np.array
   eval_labels = np.asarray(mnist.test.labels, dtype=np.int32)
-
 
   # Create the Estimator
   mnist_classifier = tf.estimator.Estimator(
@@ -164,6 +153,7 @@ def main(unused_argv):
       batch_size=100,
       num_epochs=None,
       shuffle=True)
+
   mnist_classifier.train(
       input_fn=train_input_fn,
       steps=20000,
@@ -180,4 +170,5 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
+  tf.reset_default_graph()
   tf.app.run()
