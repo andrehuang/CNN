@@ -3,7 +3,9 @@
 
 
 #### 11.4 updates: 
-uploaded the demo framework: mask_cnn_mnist.py; modified mask_op.py, with forward pass successfully run in the "framework".  __NEXT__: combine forward with corresponding bprop function.
+-  uploaded the demo framework: mask_cnn_mnist.py; 
+-  modified mask_op.py, with forward pass successfully run in the "framework".  
+-  __NEXT__: combine forward with corresponding bprop function.
 #### 10.31 updates: 
 uploaded mask_op, which has the forward pass function changed to be the mask function.
 
