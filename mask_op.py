@@ -211,7 +211,6 @@ def tf_mask(x, name=None):
 #             tf.global_variables_initializer().run()
 #             print(x.eval(), z.eval(), gr.eval())
 
-
 # 几个改写的注意点：
 # 1 Python中的index从0开始
 # 2 关于shape, MATLAB中采用[h, w, depth, batchS]
