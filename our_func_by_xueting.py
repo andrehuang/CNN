@@ -142,7 +142,7 @@ def process_gradient(x, grad):
     return grad
 
 def tf_process_gradient(x, grad, name=None):
-     with ops.name_scope(name, "process_gradient", [x, grad]) as name:   # where bug is
+     with ops.name_scope(name, "process_gradient", [x, grad]) as name:
          z = tf.py_func(process_gradient,
                      [x, grad],
                      [tf.float32],
