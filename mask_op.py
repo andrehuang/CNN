@@ -116,7 +116,7 @@ def np_mask(x):
     x_new = np.multiply(mask, x)
     return np.maximum(x_new, 0).astype(np.float32)
 
-# Test:
+# Test of np_mask:
 # test = np.arange(1, 61)
 # test = np.reshape(test, [3, 2, 2, 5])
 # np_mask(test)
@@ -128,8 +128,10 @@ def np_mask(x):
 
 # The next three functions help us get a tf function to get gradients in bprop
 # corresponding to our customized op
+# 我们先不考虑正负样本的问题
 
-def d_relu(x):
+
+def d_mask(x):
     """
     CURRENTLY,
     :param x: a number
@@ -137,25 +139,22 @@ def d_relu(x):
     BUT as long as we can define this function with array input and array output, i.e. a numpy function,
     We don't need to vectorize it later.
     """
-    if x > 0:
-        return 1
-    else:
-        return 0
+    mask = getMask(x)
+    return np.multiply(mask, np.maximum(mask, 0))
 
-
-d_relu = np.vectorize(d_relu)  # vectorizing: making it into a numpy function
-d_relu_32 = lambda x: d_relu(x).astype(np.float32)  # make data type compatible
+# d_relu = np.vectorize(d_relu)  # vectorizing: making it into a numpy function
+d_mask_32 = lambda x: d_mask(x).astype(np.float32)  # make data type compatible
 
 
 # transform the numpy function into a Tensorflow function
-def tf_d_relu(x, name=None):
+def tf_d_mask(x, name=None):
     """
     :param x: a list of tensors (but we can just see it as a tensor)
     :param name: 
     :return: a tensor
     """
-    with ops.name_scope(name, "d_relu", [x]) as name:  # where bug is
-        z = tf.py_func(d_relu_32,
+    with ops.name_scope(name, "d_mask", [x]) as name:
+        z = tf.py_func(d_mask_32,
                        [x],
                        tf.float32,
                        name=name,
@@ -166,6 +165,7 @@ def tf_d_relu(x, name=None):
 # tf.py_func acts on lists of tensors (and returns a list of tensors),
 # that is why we have [x] (and return z[0]).
 
+# grad = cus_op.inputs[0]
 def our_grad(cus_op, grad):
     """Compute gradients of our custom operation.
     Args:
@@ -176,8 +176,10 @@ def our_grad(cus_op, grad):
         it's an n-tuple, where n is the number of arguments of the operation   
     """
     x = cus_op.inputs[0]
-    n_gr = tf_d_relu(x)
-    return tf.multiply(grad, n_gr)
+    n_gr1 = tf_d_mask(x)
+    # dLossf/dx
+    n_gr2 = 0
+    return tf.multiply(grad, n_gr1) + n_gr2
 
 
 # our final op
@@ -198,7 +200,7 @@ def tf_mask(x, name=None):
         return z
 
 # Test:
-
+#
 # with tf.Session() as sess:
 #             x = tf.constant([1., 2., 0.3, 0.1, -1., -1.5, 1.0, -8.0])
 #             # x = tf.constant([[[1., 2., -3., 5.]], [[7., -8., 9., -10.]]])
@@ -210,6 +212,7 @@ def tf_mask(x, name=None):
 #             gr = tf.gradients(z, [x])[0]
 #             tf.global_variables_initializer().run()
 #             print(x.eval(), z.eval(), gr.eval())
+
 
 # 几个改写的注意点：
 # 1 Python中的index从0开始
