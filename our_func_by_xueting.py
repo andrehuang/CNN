@@ -32,26 +32,22 @@ class div: #initialize Div struct by depthList and posList
         self.posList = posList
 
 def setup_div(layer, end_layer):
-    depthList = np.nonzero(layer.filters>1)[0]
-    #print (depthList)
-    
+
+    depthList = np.nonzero(layer.filters>0)[0]
     labelNum = (end_layer.theclass.shape)[2]
-    #print (labelNum)
 
     div_list = []
     if labelNum == 1:
         theClass = end_layer.theclass
         theClass = theClass.flatten('C')
-#        print (theClass)
         posList = np.nonzero(theClass==1)[0]
-#        print (posList)
         div_list.append(div(depthList,posList))
+
     else:
         theClass = np.amax(end_layer.theclass, axis = 2)
         theClass = theClass.flatten('C')
-#        print (theClass)
         posList = np.nonzero(theClass==1)[0]
-#        print (posList)
+
         if layer.sliceMag.size == 0:
             div_list.append(depthList,posList)
         else:
@@ -65,9 +61,7 @@ def setup_div(layer, end_layer):
                 div_list.append(div(depthList, posList))
     
     return div_list
-    #print (len(div_list))
-    #print (div_list[0].depthList)
-    #print (div_list[0].posList)
+    
 
 def setup_logz(layer,end_layer, grad, mask, theInput, depth, batchS):
     imgNum = (end_layer.theclass.shape)[3]
@@ -75,40 +69,39 @@ def setup_logz(layer,end_layer, grad, mask, theInput, depth, batchS):
     alpha = 0.5
     grad = np.multiply(grad, np.maximum(mask,0))
 
- #I think we can assume layer.filters == 1 since the situation when layer.filters == 2 is not implemented this time
+    # assume layer.filters == 1 since the situation when layer.filters == 2 is not implemented this time
     strength = np.reshape(np.mean(np.mean(np.multiply(theInput, mask), axis=0), axis=1), (depth, batchS))
     layer.set_strength(strength)
-    alpha_logZ_pos = np.reshape(np.log(np.mean(np.exp(np.mean(np.mean(np.multiply(theInput, mask[:,:,end:1:-1,end:1:-1]),axis = 0),axis = 1)),axis = 3)) * alpha, (depth, 1))
-    alpha_logZ_neg = np.reshape(np.log(np.mean(np.exp(np.mean(np.mean(-theInput, axis = 0), axis = 1)/0.5), axis = 3)) * 0.5, (depth, 1))
+    alpha_logZ_pos = np.reshape(np.log(np.mean(np.exp(np.divide(np.mean(np.mean(np.multiply(theInput, mask[:,:,::-1,::-1]),axis = 0),axis = 1), alpha)),axis = 3)) * alpha, (depth, 1))
+    alpha_logZ_neg = np.reshape(np.log(np.mean(np.exp(np.divide(np.mean(np.mean(-theInput, axis = 0), axis = 1),alpha)), axis = 3)) * alpha, (depth, 1))
     alpha_logZ_pos[np.isinf(alpha_logZ_pos)] = np.amax(alpha_logZ_pos[np.isinf(alpa_logZ_pos)==0])
     alpha_logZ_neg[np.isinf(alpha_logZ_neg)] = np.amax(alpha_logZ_neg[np.isinf(alpa_logZ_neg)==0])
 
     return alpha_logZ_pos, alpha_logZ_neg
 
-#    if np.sum(layer.filter==2) > 0: #a little complicated; todo 
 
 
-def post_process_gradient(layer, end_layer, grad, alpha_logZ_pos, alpha_logZ_neg, div_list):
+def post_process_gradient(layer, end_layer, grad, theInput, alpha_logZ_pos, alpha_logZ_neg, div_list):
     for lab in range (0, len(div_list)):
         if len(div_list) == 1:
             w_pos = 1
             w_neg = 1
         else:
-            density = end_layer.density
+            density = end_layer.density            # shape ?
             w_pos = np.divide(0.5, density[lab])
             w_neg = np.divide(0.5, 1-density[lab])
         
         ## For parts
-        mag = (np.divide(np.ones([depth, imgNum]),np.divide(1, end_layer.iters)),layer.mag)
+        mag = (np.divide(np.ones([depth, imgNum]),np.divide(1, end_layer.iters)),layer.mag)      # iter, mag ?
         dList = div_list[lab].depthList
         dList = dList[layer.filters[dList]==1]
         if not np.isempty(dList):
             theList = div_list[lab].posList
-            if not np.isempty(thelist):
+            if not np.isempty(theList):
                 strength = np.multiply(np.exp(np.divide(layer.strength[dList,theList], alpha)),layer.strength[dList,theList] - np.tile(alpha_logZ_pos[dlist], [1, theList.size])+alpha)
                 strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength)==0])
                 strength[np.isnan(strength)] = 0
-                strength = np.reshape(np.multiply(np.divide(strength, np.tile(np.mean(strength, 1), [1, theList.size])), mag(dList, theList)), [1,1, dList.size, theList.size])
+                strength = np.reshape(np.multiply(np.divide(strength, np.tile(np.mean(strength, 1), [1, theList.size])), mag[dList, theList]), [1, 1, dList.size, theList.size])
                 strength[np.isnan(strength)] = 0
                 strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength)==0])
 
@@ -117,11 +110,11 @@ def post_process_gradient(layer, end_layer, grad, alpha_logZ_pos, alpha_logZ_neg
 
             theList_neg = np.setdiff1d(np.arange(batchS), div_list[lab].posList)
             if not np.isempty(theList_neg):
-                strength = np.reshape(np.mean(np.mean(grad[:,:,dList,theList_neg],axis = 0),axis = 1), [dList.size, theList_neg.size])
+                strength = np.reshape(np.mean(np.mean(theInput[:,:,dList,theList_neg],axis = 0),axis = 1), [dList.size, theList_neg.size])
                 strength = np.multiply(np.exp(np.divide(-strength,alpha)), (-strength-np.tile(alpha_logZ_neg[dList], [1, theList_neg.size]) + alpha))
                 strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength)==0])
                 strength[np.isnan(strength)] = 0
-                strength = np.reshape(np.divide(strength, np.tile(np.mean(strength, axis=1), [1, list_neg.size])*mag(dList, theList_neg)), [1,1,dList.size, theList_neg])
+                strength = np.reshape(np.divide(strength, np.tile(np.mean(strength, axis=1), [1, list_neg.size])*mag(dList, theList_neg)), [1,1,dList.size, theList_neg.size])
                 strength[np.isnan(strength)] = 0
                 strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength)==0])
                 updated_value_neg = np.multiply(np.tile(np.reshape(strength, [1,1,dList.size, theList_neg.size]), [h,w,1,1]), (0.00001*w_neg))
@@ -131,18 +124,18 @@ def post_process_gradient(layer, end_layer, grad, alpha_logZ_pos, alpha_logZ_neg
 
 def process_gradient(x, grad):
     layer, end_layer = initialization() #这个function要改在外面declare
-    div_list = set_div(layer, end_layer)
+    div_list = setup_div(layer, end_layer)
     mask = getMask(x)
     h = x.shape[0]
     w = x.shape[1]
     depth = x.shape[2]
     batchS = x.shape[3]
     alpha_logZ_pos, alpha_logZ_neg = setup_logz(layer,end_layer, grad, mask, x, depth, batchS)
-    grad = post_process_gradient(layer, end_layer, grad, alpha_logZ_pos, alpha_logZ_neg, div_list)
+    grad = post_process_gradient(layer, end_layer, grad, x, alpha_logZ_pos, alpha_logZ_neg, div_list)
     return grad
 
 def tf_process_gradient(x, grad, name=None):
-     with ops.name_scope(name, "process_gradient", [x, grad]) as name:
+     with ops.name_scope(name, "process_gradient", [x, grad]) as name: 
          z = tf.py_func(process_gradient,
                      [x, grad],
                      [tf.float32],
@@ -170,65 +163,6 @@ def py_func(func, inp, tout, stateful=True, name=None, grad=None):
     with g.gradient_override_map({"PyFunc": rnd_name}):
         return tf.py_func(func, inp, tout, stateful=stateful, name=name)
 
-def np_relu(x):
-    """
-    :param x: an array
-    :return: an array
-    """
-    return np.maximum(x, 0)
-# make the date type compatible with tensorflow
-np_relu_32 = lambda x: np_relu(x).astype(np.float32)
-
-
-# The next three functions help us get a tf function to get gradients in bprop
-# corresponding to our customized op
-
-def d_relu(x):
-    """
-    CURRENTLY,
-    :param x: a number
-    :return:  a number
-    BUT as long as we can define this function with array input and array output, i.e. a numpy function,
-    We don't need to vectorize it later.
-    """
-    if x > 0:
-        return 1
-    else:
-        return 0
-d_relu = np.vectorize(d_relu) # vectorizing: making it into a numpy function
-d_relu_32 = lambda x: d_relu(x).astype(np.float32)  # make data type compatible
-
-
-# transform the numpy function into a Tensorflow function
-def tf_d_relu(x, name=None):
-    """
-    :param x: a list of tensors (but we can just see it as a tensor)
-    :param name: 
-    :return: a tensor
-    """
-    with ops.name_scope(name, "d_relu", [x]) as name:   # where bug is
-        z = tf.py_func(d_relu_32,
-                    [x],
-                    [tf.float32],
-                    name=name,
-                    stateful=False)
-        return z[0]
-# tf.py_func acts on lists of tensors (and returns a list of tensors),
-# that is why we have [x] (and return z[0]).
-
-def add_relu_32(x, row):
-    x[row] += x[row]
-    return x.astype(np.float32)
-
-def tf_add_relu(x, name=None):
-
-    with ops.name_scope(name, "d_relu", [x]) as name:
-        z = tf.py_func(add_relu_32,
-                    [x, 1],
-                    [tf.float32],
-                    name=name,
-                    stateful=False)
-        return z[0]
 
 def our_grad(cus_op, grad):
     """Compute gradients of our custom operation.
@@ -240,24 +174,11 @@ def our_grad(cus_op, grad):
         it's an n-tuple, where n is the number of arguments of the operation   
     """
     x = cus_op.inputs[0]
-    n_gr = tf_d_relu(x)
-    n_gr = tf_add_relu(n_gr)
-    our_grad = tf.multiply(grad, n_gr)
-    our_grad = process_gradient(x, our_grad)
-    return n_gr
+    n_gr1 = tf_d_mask(x)
+    n_gr2 = tf_process_gradient(x, n_gr1)    # ? n_gr1 or grad
 
-# our final op
-def tf_relu(x, name=None):
-    with ops.name_scope(name, "OurRelu", [x]) as name:   # where bug is
-        z = py_func(np_relu_32,
-                    [x],
-                    [tf.float32],
-                    name=name,
-                    grad=our_grad)
-        # print(z)  # [<tf.Tensor 'OurRelu:0' shape=<unknown> dtype=float32>]
-        z = z[0]      # z is a tensor now
-        z.set_shape(x.get_shape())    # We need to give z a shape
-        return z  # Tensor("OurRelu:0", dtype=float32)
+    return tf.multiply(grad, n_gr1) + n_gr2
+
 
 # Test:
 '''
