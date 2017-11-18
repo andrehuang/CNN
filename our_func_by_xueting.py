@@ -31,6 +31,8 @@ class div: #initialize Div struct by depthList and posList
         self.depthList = depthList
         self.posList = posList
 
+alpha = 0.5
+
 def setup_div(layer, end_layer):
 
     depthList = np.nonzero(layer.filters>0)[0]
@@ -49,7 +51,7 @@ def setup_div(layer, end_layer):
         posList = np.nonzero(theClass==1)[0]
 
         if layer.sliceMag.size == 0:
-            div_list.append(depthList,posList)
+            div_list.append(div(depthList,posList))
         else:
             sliceM = layer.sliceMag
             idx = np.argmax(sliceM[depthList,:], axis = 1)
@@ -61,12 +63,12 @@ def setup_div(layer, end_layer):
                 div_list.append(div(depthList, posList))
     
     return div_list
-    
+
 
 def setup_logz(layer,end_layer, grad, mask, theInput, depth, batchS):
+    
     imgNum = (end_layer.theclass.shape)[3]
-
-    alpha = 0.5
+    
     grad = np.multiply(grad, np.maximum(mask,0))
 
     # assume layer.filters == 1 since the situation when layer.filters == 2 is not implemented this time
@@ -123,7 +125,7 @@ def post_process_gradient(layer, end_layer, grad, theInput, alpha_logZ_pos, alph
     return grad
 
 def process_gradient(x, grad):
-    layer, end_layer = initialization() #这个function要改在外面declare
+    layer, end_layer = initialization() # 这个function要改在外面declare
     div_list = setup_div(layer, end_layer)
     mask = getMask(x)
     h = x.shape[0]
