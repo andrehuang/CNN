@@ -344,7 +344,7 @@ def gradient2(x, labels, epoch_):
         # print('Writing initial grad2...')
         # f.write(np.array_str(grad2)+'\n')
         # np.savetxt('grad2', grad2)
-    
+
         # IF div is not a list, len(div) will be 1,
         # IF div is a list (in multi-class case), len(div) will be the length of the list
         # print('Setting up w_pos and w_neg')
@@ -681,8 +681,9 @@ def bias_variable(shape):
 
 def main(_):
   zero = True
+  trial_loss = True
   # Import data
-  mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True, zero=zero)
+  mnist = input_data.our_read_data_sets(FLAGS.data_dir, one_hot=True, zero=zero)
 
   # during Session,
   # feed_dict assgins values to x and y_
@@ -695,7 +696,7 @@ def main(_):
   # Define loss and optimizer
   y_ = tf.placeholder(tf.float32, [None, 10])
   if zero:
-      y_ = tf.placeholder(tf.float32, [None, ]) # labels
+      y_ = tf.placeholder(tf.float32, [None, ])  # labels
 
   epoch_ = tf.placeholder(tf.float32, name='Epoch')
   # Build the graph for the deep net
@@ -718,13 +719,18 @@ def main(_):
     if zero:
         cross_entropy = tf.losses.log_loss(labels=y_,
                                            predictions=y_conv)
+        if trial_loss:
+            cross_entropy = tf.losses.mean_squared_error(labels=y_,
+                                                         predictions=y_conv)
     else:
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y_,
                                                                 logits=y_conv)
-  print(cross_entropy)
+  # print(cross_entropy)
   cross_entropy = tf.reduce_mean(cross_entropy)
-  print(cross_entropy)
+  # print(cross_entropy)
   tf.summary.scalar('loss', cross_entropy)
+  # Finally I use MSE as loss function temporarily, avoiding the tround caused by -1.
+
 
 
   with tf.name_scope('adam_optimizer'):
@@ -749,12 +755,20 @@ def main(_):
 
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for epoch in range(501):
+    for epoch in range(3001):
       batch = mnist.train.next_batch(50)   # batch[0] are images, batch[1] are labels
       if epoch % 100 == 0:    # every 100 epochs, get a summary
         if zero:
-            summary = sess.run(merged, feed_dict={
+            if trial_loss:
+                cross_entropy1 = tf.reduce_mean(tf.losses.mean_squared_error(labels=y_,
+                                           predictions=y_conv))
+            else:
+                cross_entropy1 = tf.reduce_mean(tf.losses.log_loss(labels=y_,
+                                           predictions=y_conv))
+            # Loss can not be calculated bacause y_conv has -1 which can not be taken log.
+            [summary, loss_val] = sess.run([merged, cross_entropy1], feed_dict={
                 x: batch[0], y_: batch[1], epoch_: epoch, keep_prob: 1.0})
+            print('loss at epoch {} is {}'.format(epoch, loss_val))
         else:
             summary, _ = sess.run([merged, accuracy], feed_dict={
                 x: batch[0], y_: batch[1], keep_prob: 1.0})
@@ -846,3 +860,9 @@ if __name__ == '__main__':
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
   else:
     tf.app.run(main=main2)
+
+
+# 学习一个！
+# The reason you are getting NaN's is most likely that somewhere
+# in your cost function or softmax you are trying to take a log of zero,
+# which is not a number.
