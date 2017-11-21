@@ -736,12 +736,16 @@ def main(_):
   with tf.name_scope('adam_optimizer'):
     train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
 
-  if not zero:
-      with tf.name_scope('accuracy'):
-          correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
-          correct_prediction = tf.cast(correct_prediction, tf.float32)
-      accuracy = tf.reduce_mean(correct_prediction)
-      tf.summary.scalar('acuuracy', accuracy)
+    with tf.name_scope('accuracy'):
+        if zero:
+            # Not sure whether calculate accuracy like this is right
+            correct_prediction = tf.equal(tf.round(y_conv), y_)
+            correct_prediction = tf.cast(correct_prediction, tf.float32)
+        else:
+            correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+            correct_prediction = tf.cast(correct_prediction, tf.float32)
+    accuracy = tf.reduce_mean(correct_prediction)
+    tf.summary.scalar('acuuracy', accuracy)
 
 
   merged = tf.summary.merge_all()
@@ -759,16 +763,17 @@ def main(_):
       batch = mnist.train.next_batch(50)   # batch[0] are images, batch[1] are labels
       if epoch % 100 == 0:    # every 100 epochs, get a summary
         if zero:
-            if trial_loss:
-                cross_entropy1 = tf.reduce_mean(tf.losses.mean_squared_error(labels=y_,
-                                           predictions=y_conv))
-            else:
-                cross_entropy1 = tf.reduce_mean(tf.losses.log_loss(labels=y_,
-                                           predictions=y_conv))
+            # if trial_loss:
+            #     cross_entropy1 = tf.reduce_mean(tf.losses.mean_squared_error(labels=y_,
+            #                                predictions=y_conv))
+            # else:
+            #     cross_entropy1 = tf.reduce_mean(tf.losses.log_loss(labels=y_,
+            #                                predictions=y_conv))
             # Loss can not be calculated bacause y_conv has -1 which can not be taken log.
-            [summary, loss_val] = sess.run([merged, cross_entropy1], feed_dict={
+            [summary, loss_val, acc] = sess.run([merged, cross_entropy, accuracy], feed_dict={
                 x: batch[0], y_: batch[1], epoch_: epoch, keep_prob: 1.0})
-            print('loss at epoch {} is {}'.format(epoch, loss_val))
+            print('epoch {}, loss {}'.format(epoch, loss_val))
+            print('epoch {}, training accuracy {}'.format(epoch, acc))
         else:
             summary, _ = sess.run([merged, accuracy], feed_dict={
                 x: batch[0], y_: batch[1], keep_prob: 1.0})
