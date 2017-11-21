@@ -239,17 +239,33 @@ class DIV:  # initialize Div struct by depthList and posList
 
 
 def gradient2(x, labels, epoch_):
-    # MAYBE need to change labels to a numpy array
     batchS, h, w, depth = x.shape
     depthList = np.arange(depth)
+    epoch_ += 1  # we don't want epoch_ = 0
     if len(labels.shape) < 2:
         labelNum = 1
     else:
         labelNum = labels.shape[1]
     if labelNum == 1:
+        labels = np.squeeze(labels)
         bool_mask = [labels == 1]
-        posList = tf.boolean_mask(labels, bool_mask)
+        # print(bool_mask)  # shape (50,)
+        # labels = tf.convert_to_tensor(labels, tf.float32)
+        # print(labels)
+        # labels shape (1, 50)
+        label_index = np.arange(labels.size)
+        posList = label_index[bool_mask]
+        # print(2)
+        # This way we can only get a list full of 1
+        # I think we should change the "labels" to np.arange(labels.size)
+
         div = [DIV(depthList, posList)]
+        # print('Writing div')
+        # f1 = open('div.txt', 'w')
+        # f1.write(str(div))
+        # f1.close()
+        # print(3)
+
         # different data structue to store DIV from MATLAB
         # since depthList and posList have different lengths,
         # we cannot put them into one array
@@ -261,43 +277,77 @@ def gradient2(x, labels, epoch_):
     imgNum = batchS
     alpha = 0.5
     mask = getMask(x)
+    # print('hey')
+###########################################################################################
+    ##################################### 11.19 ######################################
+    ###########################有很多data type和shape的细节问题##########################
 
     def setup_logz(mask, theInput, depth, batchS):
         nonlocal alpha
+        # f = open("setup_logz1.txt", "w")
         emp1 = np.zeros((batchS, depth))
+        # print('setup logz')
         strength = np.mean(np.multiply(theInput, mask),  axis=(1, 2)) + emp1
+        # print('Writing strength to the file...')
+        # f.write(str(strength) + "\n")
+        # print('calculate strength')
         # strength now has shape (batchS, depth), value = "spatial" mean of x*mask
         emp2 = np.zeros((1, depth))
         alpha_logZ_pos = np.multiply(np.log(np.mean(
             np.exp(np.divide(np.mean(np.multiply(theInput, mask[::-1, :, :, ::-1]), axis=(1, 2)), alpha)), axis=0)), alpha) \
             + emp2
+        # print('Writing alpha_logZ_pos to the file...')
+        # f.write(str(alpha_logZ_pos) + "\n")
         # shape is (1, depth)
 
         alpha_logZ_neg = np.multiply(np.log(np.mean(
             np.exp(np.divide(np.mean(-theInput, axis=(1, 2)), alpha)), axis=0)), alpha) \
             + emp2
+        # print('Writing alpha_logZ_neg to the file...')
+        # f.write(str(alpha_logZ_neg) + "\n")
+
         if len(alpha_logZ_pos.shape) != 2:
             raise ValueError('The shape of alpha_logZ_pos is not (1, depth)!')
         # shape is (1, depth)
-        # VALUE CHECKING:
-        alpha_logZ_pos[np.isinf(alpha_logZ_pos)] = np.amax(alpha_logZ_pos[np.isinf(alpha_logZ_pos) == 0])
-        alpha_logZ_neg[np.isinf(alpha_logZ_neg)] = np.amax(alpha_logZ_neg[np.isinf(alpha_logZ_neg) == 0])
+
+        # VALUE CHECKING:########################################
+        # alpha_logZ_pos[np.isinf(alpha_logZ_pos)] = np.amax(alpha_logZ_pos[np.isinf(alpha_logZ_pos) == 0])
+        # alpha_logZ_neg[np.isinf(alpha_logZ_neg)] = np.amax(alpha_logZ_neg[np.isinf(alpha_logZ_neg) == 0])
+        #########################################################
+        # f.close()
         return alpha_logZ_pos, alpha_logZ_neg, strength
+
+    # print('run this')
+    # print(mask, x, depth, batchS)
+    # array, array, 64, 50
     alpha_logZ_pos, alpha_logZ_neg, strength = setup_logz(mask, x, depth, batchS)
+    # print('finish setup_logz')
     # "strength" is also something that belongs to one input(x)
     # strength has shape (batchS, depth), value = "spatial" mean of x*mask
     # alpha_logZ_pos has shape (1, depth)
 
+    # f = open('post_process_gradient.txt', 'w')
+    # f.write('Initital:\n'+str(alpha_logZ_pos)+'\n' +
+    #         str(alpha_logZ_neg)+'\n' +
+    #         str(strength)+'\n')
 
     def post_process_gradient(theInput, alpha_logZ_pos, alpha_logZ_neg, div, strength):
-        # for lab in range(0, len(div_list)):  (deprecated) in MATLAB div_list is an array with 2 attributes; not a list with 2 elements
         nonlocal depth
         nonlocal imgNum
         nonlocal alpha
-        global mag #####################PROBLEM###############################
+        nonlocal h
+        nonlocal w
+        nonlocal alpha
+        global mag
+        # print('Start pose_process_gradient')
         grad2 = np.zeros((batchS, h, w, depth))
+        # print('Writing initial grad2...')
+        # f.write(np.array_str(grad2)+'\n')
+        # np.savetxt('grad2', grad2)
+
         # IF div is not a list, len(div) will be 1,
         # IF div is a list (in multi-class case), len(div) will be the length of the list
+        # print('Setting up w_pos and w_neg')
         for lab in range(len(div)):  # should be 1
             if lab == 1:
                 raise ValueError('It is impossible in single class case!')
@@ -305,25 +355,31 @@ def gradient2(x, labels, epoch_):
                 w_pos = 1
                 w_neg = 1
             else:
-                raise ValueError('Currently we dont consider multi-class case!')
+                raise ValueError('Currently we do not consider multi-class case!')
                 # density = end_layer.density  # shape ?
                 # w_pos = np.divide(0.5, density[lab])
                 # w_neg = np.divide(0.5, 1 - density[lab])
-
             ## For parts
-            # mag ---------- 暂时放一下，不管它，之后调整
             # mag initial = 0.1
             # I temporarily put it in the deepnn function
             # call it a global variable
             # but not sure what this means
             mag = np.divide(np.multiply(np.ones((imgNum, depth)), epoch_), mag)
+            # print('Writing mag...')
+            # f.write(np.array_str(mag)+'\n')
+            # np.savetxt('mag', mag)
 
             dList = div[lab].depthList
+            # print('check Dlist again')
+            # f.write(np.array_str(dList) + '\n')
             # dList = dList[layer.filters[dList] == 1]    ---------no idea of this.
 
             if dList.size != 0:  # if dList is not empty
                 poslist = div[lab].posList
                 neglist = np.setdiff1d(np.arange(batchS), poslist)
+                # print('Writing poslist and neglist...')
+                # f.write(np.array_str(poslist)+'\n' +
+                #         np.array_str(neglist)+'\n')
                 ############################ATTENTION####################################
                 # 有一点我觉得很危险，就是poslist和neglist是不是真的如我们所想的是在label中的位置？
                 # 但是很奇怪的是MATLAB里的代码中posList好像也不是位置，而是1，2，……396
@@ -333,69 +389,123 @@ def gradient2(x, labels, epoch_):
                 #########################################################################
                 # theList is a subset of labels (batch)
                 # dList is a subset of depth (filters)
-
-                emp3 = np.zeros(poslist.size, dList.size)  # control the shape!
+                # print(poslist.size)  # 5
+                # print(neglist.size)  # 45
+                # print(dList.size)    # 64
+                # print(h, w)          # 14, 14
+                emp3 = np.zeros((poslist.size, dList.size))  # control the shape!
                 emp4 = np.zeros((poslist.size, 1, 1, dList.size))
                 emp5 = np.zeros((poslist.size, h, w, dList.size))
-                emp3_ = np.zeros(neglist.size, dList.size)
+                emp3_ = np.zeros((neglist.size, dList.size))
                 emp4_ = np.zeros((neglist.size, 1, 1, dList.size))
                 emp5_ = np.zeros((neglist.size, h, w, dList.size))
-                # calculate the gradients for poslist
+                # print(emp3, emp3_)
+                # print('Calculate the gradients for poslist')
+                ############################################ 11.20 before dinner ##############################
+                ############################################### mark progress #################################
+
                 if poslist.size != 0:
-                    strength = np.multiply(np.exp(np.divide(strength[poslist, dList], alpha)),
-                                           strength[poslist, dList] - np.add(alpha_logZ_pos[0, dList], emp3) + alpha)
+                    # print('run into first if conditional')
+                    # print(alpha_logZ_pos.shape)  # (1, 64)
+                    # print(strength.shape)     # (50, 64)
+                    # print(poslist, dList)
+                    # print(poslist.shape, dList.shape)  # (8,) (64,)
+                    # print(strength[poslist, dList])  # Problem!
+                    # rows = strength[poslist][:, dList]
+                    # print(rows[:, dList])
+                    # what we want: strength to be a array with shape (poslist.size, dList.size)
+
+
+                    # add1 = np.exp(np.divide(strength[poslist][:, dList], alpha))
+                    # print(add1.shape)
+                    # add2 = strength[poslist][:, dList] - np.add(alpha_logZ_pos[0, dList], emp3) + alpha
+                    # print(add2)
+                    strength = np.multiply(np.exp(np.divide(strength[poslist][:, dList], alpha)),
+                                           strength[poslist][:, dList] - np.add(alpha_logZ_pos[0, dList], emp3) + alpha)
+                    # print('strength1')
+                    # print(strength.shape)  # (5, 64)
                     # strength should have the same shape as emp3, (theList.size, dList.size)
                     # we take a subset of the original strength for calculation
 
-                    strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
-                    strength[np.isnan(strength)] = 0
-                    strength = np.divide(strength, np.multiply(np.mean(strength, 0) + emp3, mag[poslist, dList]) + emp3) + emp4
-                    # Now strength has the shape (poslist.size, 1, 1, dList.size)
+                    ##################################################################
+                    # strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
+                    # strength[np.isnan(strength)] = 0
+                    #################################################################
+                    # print(np.add(np.mean(strength, 0)+emp3).shape)
 
-                    strength[np.isnan(strength)] = 0
-                    strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
+                    strength = np.reshape(np.divide(strength, np.multiply(np.mean(strength, 0)+emp3, mag[poslist][:, dList]) + emp3),
+                                          (poslist.size, 1, 1, depthList.size))
+
+                    # Now strength has the shape (poslist.size, 1, 1, dList.size)
+                    # print('strength2')
+                    # print(strength.shape)
+
+                    ######################################################
+                    # strength[np.isnan(strength)] = 0
+                    # strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
+                    ########################################################
 
                     # normalized by mean of strength: problems #####
-                    ############################ DOES MASK NEEDED HERE????##############################
+                    ############################## IS MASK NEEDED HERE????##############################
                     ################because we have different net structures from MATLAB################
-                    updated_value = -np.multiply(np.multiply(mask[poslist, :, :, dList],
+
+                    # a = strength + emp5
+                    # print(a.shape)
+                    updated_value = -np.multiply(np.multiply(mask[poslist][:, :, :, dList],
                                                              strength + emp5),
                                                  0.00001 * w_pos)
-                    grad2[poslist, :, :, dList] += updated_value
+                    # print(updated_value.shape)
+                    grad2[poslist][:, :, :, dList] += updated_value
 
-                # calculate the gradients for neglist
+                # print('Calculate the gradients for neglist')
                 if neglist.size != 0:
-                    strength = np.mean(theInput[neglist, :, :, dList], axis=(1, 2)) + emp3_
+                    strength = np.mean(theInput[neglist][:, :, :, dList], axis=(1, 2)) + emp3_
+                    # print('strength0_')
+                    # print(strength.shape)
                     strength = np.multiply(np.exp(np.divide(-strength, alpha)),
                                            (-strength - np.add(alpha_logZ_neg[0, dList], emp3_) + alpha))
-                    strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
-                    strength[np.isnan(strength)] = 0
+                    # print('strength1_')
+                    # print(strength.shape)
+                    #####################################################
+                    # strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
+                    # strength[np.isnan(strength)] = 0
+                    #####################################################
 
-                    strength = np.divide(strength,
-                                         np.multiply(np.mean(strength, 0) + emp3_, mag[neglist, dList] + emp3_)) + emp4_
+                    strength = np.reshape(np.divide(strength,
+                                         np.multiply(np.mean(strength, 0) + emp3_, mag[neglist][:, dList] + emp3_)),
+                                          (neglist.size, 1, 1, depthList.size))
+                    # print('strength2_')
+                    # print(strength.shape)
                     # strength now has the shape (neglist.size, 1, 1, dList.size)
-                    strength[np.isnan(strength)] = 0
-                    strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
+                    ###################################################################
+                    # strength[np.isnan(strength)] = 0
+                    # strength[np.isinf(strength)] = np.amax(strength[np.isinf(strength) == 0])
+                    ###################################################################
 
                     updated_value_neg = np.multiply(strength + emp5_, (0.00001 * w_neg))
-                    grad2[neglist, :, :, dList] += updated_value_neg
-
+                    # print(updated_value_neg.shape)
+                    grad2[neglist][:, :, :, dList] += updated_value_neg
+                    # print(grad2.shape)
         return grad2
 
-    grad2 = post_process_gradient(x, alpha_logZ_pos, alpha_logZ_neg, div, strength)
+    # f.close()
 
+    grad2 = post_process_gradient(x, alpha_logZ_pos, alpha_logZ_neg, div, strength)
+    # print('Finally we reach here!')
+    # print(grad2.shape)
+    grad2 = grad2.astype(np.float32)
+    # print(grad2.dtype)
     return grad2
 
 
 def tf_gradient2(x, labels, epoch_, name=None):
     with ops.name_scope(name, "gradient2", [x, labels, epoch_]) as name:
         z = tf.py_func(gradient2,
-                           [x, labels, epoch_],
-                           [tf.float32],
+                           inp=[x, tf.convert_to_tensor(labels, tf.float32), epoch_],
+                           Tout=[tf.float32],
                            name=name,
                            stateful=False)
         return z[0]
-# output的shape不对
 
 # tf.py_func acts on lists of tensors (and returns a list of tensors),
 # that is why we have [x] (and return z[0]).
@@ -419,6 +529,7 @@ def our_grad(cus_op, grad):
 
     fake_gr1 = labels
     fake_gr2 = epoch_
+
     return tf.multiply(grad, n_gr1) + n_gr2, fake_gr1, fake_gr2
 
 
@@ -541,7 +652,7 @@ def conv2d(x, W):
 def tf_mask(x, labels, epoch_, name=None):  # add "labels" to the input
     with ops.name_scope(name, "Mask", [x, labels, epoch_]) as name:
         z = py_func(np_mask,
-                    [x, labels, epoch_],   # add "labels, epoch_" to the input list
+                    [x, tf.convert_to_tensor(labels, tf.float32), epoch_],   # add "labels, epoch_" to the input list
                     [tf.float32],
                     name=name,
                     grad=our_grad)
@@ -586,8 +697,7 @@ def main(_):
   if zero:
       y_ = tf.placeholder(tf.float32, [None, ]) # labels
 
-  epoch_ = tf.placeholder(tf.float32)
-
+  epoch_ = tf.placeholder(tf.float32, name='Epoch')
   # Build the graph for the deep net
   y_conv, keep_prob = deepnn(x, y_, epoch_)    # provide the deep net graph also with the labels
 
@@ -611,7 +721,9 @@ def main(_):
     else:
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y_,
                                                                 logits=y_conv)
+  print(cross_entropy)
   cross_entropy = tf.reduce_mean(cross_entropy)
+  print(cross_entropy)
   tf.summary.scalar('loss', cross_entropy)
 
 
