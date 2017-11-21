@@ -344,7 +344,7 @@ def gradient2(x, labels, epoch_):
         # print('Writing initial grad2...')
         # f.write(np.array_str(grad2)+'\n')
         # np.savetxt('grad2', grad2)
-
+    
         # IF div is not a list, len(div) will be 1,
         # IF div is a list (in multi-class case), len(div) will be the length of the list
         # print('Setting up w_pos and w_neg')
