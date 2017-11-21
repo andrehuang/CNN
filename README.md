@@ -2,7 +2,7 @@
 ## Haiwen's approach
 
 #### 11.20 updates:
-- upload the latest file **our_cnn_mnist2**, which includes forward and back propagation.
+- upload the latest file **our_cnn_mnist2.py**, which includes forward and back propagation.
 
 
 #### 11.4 updates: 
