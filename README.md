@@ -3,6 +3,7 @@
 
 #### 11.20 updates:
 - upload the latest file **our_cnn_mnist2.py**, which includes forward and back propagation.
+- upload **our_mnist.py**, where I modified the label extraction function.
 
 
 #### 11.4 updates: 
