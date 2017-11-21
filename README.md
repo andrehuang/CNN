@@ -1,6 +1,9 @@
 # Interpretable CNN
 ## Haiwen's approach
 
+#### 11.20 updates:
+- upload the latest file **our_cnn_mnist2**, which includes forward and back propagation.
+
 
 #### 11.4 updates: 
 -  uploaded the demo framework: mask_cnn_mnist.py; 
