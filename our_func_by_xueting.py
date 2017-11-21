@@ -34,6 +34,18 @@ class div: #initialize Div struct by depthList and posList
 alpha = 0.5
 theclass = np.random.random_integers(5,size=(5,5,1,5))
 
+myLayer = layer()
+endLayer = end_layer()
+theFilters = myLayer.filters
+endClass = endLayer.theclass
+h = 0        
+w = 0     
+depth = 0     
+batchS = 0  
+mask = np.zeros([batchS, h, w, depth])  
+   
+def getMask(mask):
+    return mask 
 
 def setup_div(layer, end_layer):
     depthList = np.nonzero(layer.filters>0)[0]
@@ -84,7 +96,7 @@ def setup_logz(layer,end_layer, grad, theInput, depth, batchS):
 
 
 
-def post_process_gradient(layer, end_layer, grad, theInput, alpha_logZ_pos, alpha_logZ_neg, div_list):
+def post_process_gradient(layer, end_layer, grad, theInput, alpha_logZ_pos, alpha_logZ_neg, div_list, batchS):
     w_pos = 0.5
     w_neg = 0.5
     for lab in range (0, len(div_list)):
@@ -126,48 +138,28 @@ def post_process_gradient(layer, end_layer, grad, theInput, alpha_logZ_pos, alph
                 grad[:,:,dlist, theList_neg] += updated_value_neg
     
     return grad
-'''
-def process_gradient(x):
-    print("start process gradient setting")
+
+
+def process_gradient(x, grad):
+    print("Come into function process_gradient")
     div_list = False
     print(div_list)
-    layer, end_layer = initialization() # 这个function要改在外面declare
-    div_list = setup_div(layer, end_layer)
-#    mask = getMask(x)
+#    layer, end_layer = initialization() # 这个function要改在外面declare
+    div_list = setup_div(myLayer, endLayer)
     print(div_list)
     print("getting out of setup_div")
     print(x)
-    h = x.shape[0]
-    w = x.shape[1]
-    depth = x.shape[2]
-    batchS = x.shape[3]
-    alpha_logZ_pos, alpha_logZ_neg = setup_logz(layer,end_layer, grad, mask, x, depth, batchS)
-    grad = post_process_gradient(layer, end_layer, grad, x, alpha_logZ_pos, alpha_logZ_neg, div_list)
+    global h, w, depth, batchS, mask
+    mask = getMask(x)
+    h = x.shape[0]          # batchS = x.shape[0]
+    w = x.shape[1]          # h = x.shape[1]
+    depth = x.shape[2]      # w = x.shape[2]
+    batchS = x.shape[3]     # depth = x.shape[3]
+    alpha_logZ_pos, alpha_logZ_neg = setup_logz(myLayer,endLayer, grad, x, depth, batchS)
+    grad = post_process_gradient(layer, end_layer, grad, x, alpha_logZ_pos, alpha_logZ_neg, div_list, batchS)
     return grad.astype(np.float32)
-'''
 
-def process_gradient(x):
-    """
-    CURRENTLY,
-    :param x: a number
-    :return:  a number
-    BUT as long as we can define this function with array input and array output, i.e. a numpy function,
-    We don't need to vectorize it later.
-    """
-    print("getting to this process_gradient_function")
-    if x > 0:
-        return 1
-    else:
-        return 0
-process_gradient = np.vectorize(process_gradient) # vectorizing: making it into a numpy function
-process_gradient_32 = lambda x: process_gradient(x).astype(np.float32)  # make data type compatible
 
-def tf_process_gradient(x, name=None):
-    print("getting up this function")
-    with ops.name_scope(name, "process_gradient", [x]) as name: 
-        print("getting up to process_gradient")
-        z = tf.py_func(process_gradient_32,[x],tf.float32,name=name,stateful=False)
-        return z[0]
 
 #Code above was added by XuetingYan
 
@@ -210,7 +202,6 @@ def d_relu(x):
     BUT as long as we can define this function with array input and array output, i.e. a numpy function,
     We don't need to vectorize it later.
     """
-    print("getting to this d_relu function!!!!")
     if x > 0:
         return 1
     else:
@@ -236,6 +227,33 @@ def tf_d_relu(x, name=None):
 # tf.py_func acts on lists of tensors (and returns a list of tensors),
 # that is why we have [x] (and return z[0]).
 
+'''
+def process_gradient(x):
+    """
+    CURRENTLY,
+    :param x: a number
+    :return:  a number
+    BUT as long as we can define this function with array input and array output, i.e. a numpy function,
+    We don't need to vectorize it later.
+    """
+    print("getting to this process_gradient_function")
+    if x > 0:
+        return 1
+    else:
+        return 0
+process_gradient = np.vectorize(process_gradient) # vectorizing: making it into a numpy function
+process_gradient_32 = lambda x: process_gradient(x).astype(np.float32)  # make data type compatible
+'''
+
+def tf_process_gradient(x, grad, name=None):
+    print("getting up this function")
+    with ops.name_scope(name, "process_gradient_name", [x, grad]) as name: 
+        print("getting up to process_gradient")
+        z = tf.py_func(process_gradient,[x, grad],[tf.float32],name=name,stateful=False)
+        return z[0]
+
+
+
 def our_grad(cus_op, grad):
     """Compute gradients of our custom operation.
     Args:
@@ -247,8 +265,8 @@ def our_grad(cus_op, grad):
         """
     x = cus_op.inputs[0]
     n_gr = tf_d_relu(x)
-    n_gr2 = tf_process_gradient(x)
-    return tf.multiply(grad, n_gr)
+    n_gr2 = tf_process_gradient(x, grad)
+    return tf.multiply(grad, n_gr)+n_gr2
 
 
 # our final op
@@ -295,6 +313,7 @@ with tf.Session() as sess:
     print(gr.eval())
 '''
 def main():
+
     myLayer = layer()
     endLayer = end_layer()
     theFilters = myLayer.filters
@@ -302,6 +321,7 @@ def main():
 
 
     div_list = setup_div(myLayer, endLayer)
+
     with tf.Session() as sess:
         x = tf.constant([[[[7., 9., -8.],[-3,4,-3]], [[4., -9, 7.], [3., -6., -1.]]]])
         x.eval()
