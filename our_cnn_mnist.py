@@ -16,7 +16,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from our_func import tf_relu
+from our_func_by_xueting import tf_relu
 
 
 import numpy as np
