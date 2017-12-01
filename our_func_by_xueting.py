@@ -16,10 +16,9 @@ from mask_cnn_mnist2 import getMask
 
 class layer: # this is an example of one layer, should be replaced by input argument later; This is equivalent to l in matlab
     def __init__(self):
-        self.filters = np.arange(4)
-        self.sliceMag = np.random.random_integers(5, size=(5,5))
-        self.mag = 0.1                     #TODO: value needs to be changed later
-
+        self.filters = np.arange(4)        # fake
+        self.sliceMag = np.random.random_integers(5, size=(5,5))    # fake
+        self.mag = 0.1                     # fake
 
     def get_filters(self):
         return self.filters
@@ -31,14 +30,14 @@ class layer: # this is an example of one layer, should be replaced by input argu
 class end_layer: 
     def __init__(self):
         self.iters = 0
-        self.theclass = np.random.random_integers(5,size=(5,5,1,5)) #labelNum > 1
+        self.theclass = np.random.random_integers(5,size=(5,5,1,5)) #labelNum > 1     # fake
         # shape [h, w, labelNum, imageNum]
         # labelNum defines the number of categories
 
 class div: #initialize Div struct by depthList and posList
     def __init__(self, depthList, posList):
-        self.depthList = depthList
-        self.posList = posList
+        self.depthList = depthList                              # fake
+        self.posList = posList                          # fake
 
 alpha = 0.5
 myLayer = layer()
