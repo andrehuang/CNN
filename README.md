@@ -1,4 +1,8 @@
 # Interpretable CNN
+
+This code implements a tensorflow version of the paper  Interpretable Convolutional Neural Networks
+Quanshi Zhang, Ying Nian Wu, Song-Chun Zhu (https://arxiv.org/abs/1710.00935). And the work is done with Quanshi Zhang while I was an exchange student at UCLA, 2017 fall.
+
 ## Haiwen's approach
 
 #### 11.20 updates:
