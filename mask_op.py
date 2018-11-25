@@ -224,3 +224,4 @@ def tf_mask(x, name=None):
 # 3 np.arange(1, h+1) 与 MATLAB中(1:h)是一样的，这也是python的特点
 # 4 shape的数字应该还是没问题的，实验了一下，[3,3]就是3*3
 # 5 延续上一点，与shape相关的index都是natural的理解方式，比如还有在linspace中给出的参数。
+
