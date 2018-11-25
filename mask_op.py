@@ -6,7 +6,7 @@
 # therefore we have to define the corresponding bprop function
 # to get the gradients
 
-# Here is a demo to try to define an relu op
+# Here is a demo 
 # experimented in our_cnn_mnist
 import numpy as np
 import tensorflow as tf
@@ -88,7 +88,8 @@ def getMask(inputs):
     empTemp = np.zeros((batchS, h, w, depth))
     posTempX = empTemp + lx
     posTempY = empTemp + ly
-
+    
+    # use broadcast to make sure shapes are matched
     mu_x = empTemp + mu_x
     mu_y = empTemp + mu_y
     # mu_x, mu_y 's shapes are both [batchS, 1, 1, depth]
@@ -131,6 +132,7 @@ def np_mask(x):
 # 我们先不考虑正负样本的问题
 
 
+######################## building the gradient function ##################
 def d_mask(x):
     """
     CURRENTLY,
@@ -180,7 +182,7 @@ def our_grad(cus_op, grad):
     # dLossf/dx
     n_gr2 = 0
     return tf.multiply(grad, n_gr1) + n_gr2
-
+####################################################################
 
 # our final op
 def tf_mask(x, name=None):
